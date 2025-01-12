@@ -25,38 +25,6 @@
 namespace nodepp { class nginx_http_t : public express_tcp_t {
 protected:
 
-    struct IP {
-        string_t  ip;
-        uint   count;
-        uint timeout;
-    };
-
-    struct NODE {
-        queue_t<IP> count;
-    };  ptr_t<NODE> cnf;
-
-    /*.........................................................................*/
-
-    bool check_ip( string_t ip, uint limit ) const noexcept {
-
-        auto n = cnf->count.first(); while( n!=nullptr ){ auto x = n->next;
-          if( n->data.ip == ip ){
-          if( n->data.timeout < process::millis() ){ cnf->count.erase(n); }
-          if( n->data.count > limit ){ return false; } n->data.count++;
-        return true; } else {
-          if( n->data.timeout < process::millis() ){ cnf->count.erase(n); }
-        } n = x; }   
-        
-        IP item; memset( &item, sizeof(item), 0 );
-        item.timeout = process::millis() + 1000;
-        item.ip = ip; item.count = 0;
-        cnf->count.push( item );
-
-        return true;
-    }
-
-    /*.........................................................................*/
-
     void file( express_http_t& cli, string_t cmd, string_t path, object_t args ) const noexcept {
 
         auto pth = regex::replace( cli.path, path, "/" );
@@ -80,95 +48,15 @@ protected:
             return; 
         }}
 
-        auto str = fs::readable( dir );
-
         if ( cli.headers["Range"].empty() == true ){
-             cli.header( "Content-Length", string::to_string(str.size()) );
-             cli.header( "Content-Type",path::mimetype(dir) );
-        if ( !regex::test(path::mimetype(dir),"text",true) ){
-             cli.header( "Cache-Control", "public, max-age=604800" );
-        }
 
-        if ( !regex::test(path::mimetype(dir),"audio|video",true) ) 
-           { cli.sendStream( str ); } cli.send();
-
-        } else {
-
-            array_t<string_t> range = regex::match_all(cli.headers["Range"],"\\d+",true);
-             ulong rang[3]; rang[0] = string::to_ulong( range[0] );
-                   rang[1] =min(rang[0]+CHUNK_MB(10),str.size()-1);
-                   rang[2] =min(rang[0]+CHUNK_MB(10),str.size()  );
-
-            cli.header( "Content-Range", string::format("bytes %lu-%lu/%lu",rang[0],rang[1],str.size()) );
-            cli.header( "Content-Type",  path::mimetype(dir) ); cli.header( "Accept-Range", "bytes" ); 
-            cli.header( "Cache-Control", "public, max-age=604800" ); 
-
-            str.set_range( rang[0], rang[2] ); 
-            cli.status(206).sendStream( str );
-
-        }
-
-    }
-
-    /*.........................................................................*/
-
-    string_t _ssr_( string_t& data ) const noexcept {
-        while( regex::test( data, "<°[^°]+°>" ) ){
-        
-            auto pttr = regex::match( data, "<°[^°]+°>" );
-            auto name = regex::match( pttr, "[^<°> \n\t]+" );
-
-            if( fs::exists_file( name ) ){ 
-                auto str = stream::await( fs::readable( name ) );
-                    data = regex::replace_all( data, pttr, str );
-            } else {
-                data = regex::replace_all( data, pttr, "file does not exists" );
-            }
-                    
-        }   return data;
-    }
-
-    /*.........................................................................*/
-
-    void fssr( express_http_t& cli, string_t cmd, string_t path, object_t args ) const noexcept {
-
-        auto pth = regex::replace( cli.path, path, "/" );
-             pth = regex::replace_all( pth, "\\.[.]+/", "" );
-
-        auto bsd =!args["path"].has_value() ? "./" :
-                   args["path"].as<string_t>() ;
-
-        auto dir = pth.empty() ? path::join( bsd, "" ) :
-                                 path::join( bsd,pth ) ;
-
-        if ( dir.empty() ){ dir = path::join( bsd, "index.html" ); }
-        if ( dir[dir.last()] == '/' ){ dir += "index.html"; }
-
-        if( fs::exists_file(dir+".html") == true ){ dir += ".html"; }
-        if( fs::exists_file(dir) == false || dir == bsd ){
-        if( fs::exists_file( path::join( bsd, "404.html" ) )){
-            dir = path::join( bsd, "404.html" ); cli.status(404);
-        } else { 
-            cli.status(404).send("Oops 404 Error"); 
-            return; 
-        }}
-
-        auto str = fs::readable( dir );
-
-        if ( cli.headers["Range"].empty() == true ){
-             cli.header( "Content-Type",path::mimetype(dir) );
-
-            if( regex::test(path::mimetype(dir),"audio|video",true) ) { cli.send(); return; }
-            if( regex::test(path::mimetype(dir),"html",true) && str.size() < CHUNK_SIZE ){
-                auto dta = stream::await( str ); while( regex::test( dta, "<°[^°]+°>" ) )
-                   { dta = _ssr_(dta); } cli.send( dta );
-            } else { 
-                cli.header( "Content-Length", string::to_string(str.size()) );
+            if( regex::test(path::mimetype(dir),"audio|video",true) ){ cli.send(); return; }
+            if( regex::test(path::mimetype(dir),"html",true) ){ cli.render(dir); } else { 
                 cli.header( "Cache-Control", "public, max-age=604800" );
-                cli.sendStream( str );
+			    cli.sendFile( dir );
             }
 
-        } else {
+        } else { auto str = fs::readable( dir );
 
             array_t<string_t> range = regex::match_all(cli.headers["Range"],"\\d+",true);
              ulong rang[3]; rang[0] = string::to_ulong( range[0] );
@@ -194,40 +82,43 @@ protected:
         auto uri = url::parse( args["href"].as<string_t>() );
         auto pth = regex::replace( cli.path, path, "/" );
              pth = path::join( uri.path, pth );
+             pth+= cli.search;
         auto slf = type::bind( cli );
         auto hdr = cli.headers;
 
-        hdr["Real-Ip"] = cli.get_peername();
-        hdr["Host"]    = uri.hostname;
+        hdr["params"] = query::format( cli.params );
+        hdr["Real-Ip"]= cli.get_peername(); 
+        hdr["Host"]   = uri.hostname;
 
-        if( uri.protocol.to_lower_case() == "https" ){ string_t dir = path::pop( _FILE_ );
-            ssl_t ssl ( path::join(dir,"cert.key"), path::join(dir,"cert.crt") );
+        if( uri.protocol.to_lower_case() == "https" ){
             
-            tls_t tmp ([=]( https_t dpx ){
-                dpx.write_header( slf->method, pth, slf->get_version(), slf->headers );
-                slf->done(); stream::duplex( *slf, dpx );
-                dpx.set_timeout(0); slf->set_timeout(0);
+            ssl_t ssl; tls_t tmp ([=]( https_t dpx ){
+                dpx.write_header( slf->method, pth, slf->get_version(), hdr );
+                dpx .set_timeout( args["timeout"].as<uint>() ); 
+                slf->set_timeout( args["timeout"].as<uint>() );
+                stream::duplex( *slf,dpx );
             }, &ssl );
 
             tmp.onError([=]( except_t err ){
                 slf->status(503).send( (string_t) err );
             });
             
-            tmp.connect( uri.hostname, uri.port );
+            tmp.connect( uri.hostname, uri.port ); slf->done();
             
         } else {
             
             tcp_t tmp ([=]( http_t dpx ){
-                dpx.write_header( slf->method, pth, slf->get_version(), slf->headers );
-                slf->done(); stream::duplex( *slf, dpx );
-                dpx.set_timeout(0); slf->set_timeout(0);
+                dpx.write_header( slf->method, pth, slf->get_version(), hdr );
+                dpx .set_timeout( args["timeout"].as<uint>() ); 
+                slf->set_timeout( args["timeout"].as<uint>() );
+                stream::duplex( *slf,dpx );
             });
 
             tmp.onError([=]( except_t err ){
                 slf->status(503).send( (string_t) err );
             });
             
-            tmp.connect( uri.hostname, uri.port );
+            tmp.connect( uri.hostname, uri.port ); slf->done();
             
         }
 
@@ -239,18 +130,14 @@ protected:
         auto n = args==nullptr ? object_t() : *args; auto self = type::bind( this );
         this->ALL( path, [=]( express_http_t& cli ){
 
-            if( n["limit"].has_value() && !self->check_ip( cli.get_peername(), n["limit"].as<uint>() ) ){
-                cli.status(429).send("too many requests"); return; 
-            }
-
+            if(!n["timeout"].has_value() ){ n["timeout"] = 0; }
             if( n["timeout"].has_value() ){ cli.set_timeout(n["timeout"].as<uint>()); }
-            if( n["method"].has_value() && n["method"].as<string_t>() != cli.method )
+            if( n["method"] .has_value() && !regex::test( cli.method, n["method"].as<string_t>() ) )
               { return; }
 
-              if( cmd.to_lower_case() == "fssr" ){ self->fssr( cli, cmd, path, n ); }
-            elif( cmd.to_lower_case() == "file" ){ self->file( cli, cmd, path, n ); }
+              if( cmd.to_lower_case() == "file" ){ self->file( cli, cmd, path, n ); }
             elif( cmd.to_lower_case() == "pipe" ){ self->pipe( cli, cmd, path, n ); }
-            elif( cmd.to_lower_case() == "move" ){ 
+            elif( cmd.to_lower_case() == "move" ){
                 auto href =!n["href"].has_value() ? "./" :  
                             n["href"].as<string_t>();
                 cli.redirect( href );
@@ -262,7 +149,7 @@ protected:
 public:
 
     template< class... T >
-    nginx_http_t( const T&... args ) : cnf( new NODE() ){ express_tcp_t( args... ); }
+    nginx_http_t( const T&... args ) noexcept { express_tcp_t( args... ); }
 
     void add( string_t cmd, string_t path, object_t args ) const noexcept {
         append( cmd, path, &args );
@@ -275,7 +162,7 @@ public:
     template< class... T >
     tcp_t& listen( const T&... args ) const noexcept {
         auto server = express_tcp_t::listen( args... );
-        obj->fd.poll( false ); return obj->fd;
+        /*obj->fd.poll( false );*/ return obj->fd;
     } 
 
 };}
