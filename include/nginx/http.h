@@ -159,12 +159,6 @@ public:
         append( cmd, path, nullptr );
     }
 
-    template< class... T >
-    tcp_t& listen( const T&... args ) const noexcept {
-        auto server = express_tcp_t::listen( args... );
-        /*obj->fd.poll( false );*/ return obj->fd;
-    } 
-
 };}
 
 /*────────────────────────────────────────────────────────────────────────────*/
