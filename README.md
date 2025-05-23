@@ -1,6 +1,6 @@
 # NODEPP-NGINX
 
-A lightweight and straightforward reverse proxy built using [NodePP](https://github.com/NodeppOfficial/nodepp). This project provides a simple way to route incoming requests to different backend servers.
+Simplify your network with NodePP! This project offers a lightweight and straightforward reverse proxy crafted with [NodePP](https://github.com/NodeppOfficial/nodepp), an asynchronous and event-driven C++ framework. It provides an easy solution for directing incoming traffic to your various backend services.
 
 ## Dependencies
 ```bash
