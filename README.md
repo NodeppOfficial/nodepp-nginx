@@ -1,6 +1,6 @@
 # NODEPP-NGINX
 
-A Simple Reverse Proxy made with NodePP
+A lightweight and straightforward reverse proxy built using [NodePP](https://github.com/NodeppOfficial/nodepp). This project provides a simple way to route incoming requests to different backend servers.
 
 ## Dependencies
 ```bash
@@ -40,11 +40,6 @@ void onMain() {
     }));
 
     app.add( "file", nullptr, object_t({
-        { "path"   , "./www" },
-        { "timeout", 30000 }
-    }));
-
-    app.add( "fssr", nullptr, object_t({
         { "path"   , "./www" },
         { "timeout", 30000 }
     }));
