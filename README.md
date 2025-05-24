@@ -1,6 +1,13 @@
-# NODEPP-NGINX
+# NodePP Reverse Proxy: Lightweight Network Traffic Management
 
-Simplify your network with NodePP! This project offers a lightweight and straightforward reverse proxy crafted with [NodePP](https://github.com/NodeppOfficial/nodepp), an asynchronous and event-driven C++ framework. It provides an easy solution for directing incoming traffic to your various backend services.
+Simplify your network infrastructure with this lightweight and efficient reverse proxy built using NodePP, a high-performance, asynchronous, and event-driven C++ framework. This project offers a straightforward solution for routing incoming HTTP(S) traffic to different backend services based on configurable rules. Leverage the speed and concurrency of NodePP to efficiently manage and direct network requests.
+
+## Key Features
+
+- **Basic Reverse Proxy Functionality:** Routes incoming HTTP(S) requests to designated backend servers.
+- **Simple Configuration:** Easy-to-understand configuration for defining routing rules (e.g., based on path, hostname).
+- **Lightweight and Fast:** Built with NodePP's C++ foundation, offering potentially lower resource consumption and higher throughput compared to interpreted solutions.
+- **Asynchronous and Non-Blocking:** Handles multiple concurrent connections efficiently thanks to NodePP's asynchronous nature.
 
 ## Dependencies
 ```bash
