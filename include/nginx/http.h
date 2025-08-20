@@ -49,6 +49,7 @@ protected:
               { cli.send(); return; }
 
             cli.header( "Cache-Control", "public, max-age=604800" );
+            cli.header( "Content-Type" , path::mimetype( dir ) );
             cli.sendStream( str );
 
         } else {
